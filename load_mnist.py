@@ -1,6 +1,7 @@
 import gzip
 import idx2numpy
 import os
+import shutil
 import sys
 import urllib2
 
