@@ -93,6 +93,7 @@ def ELU(x):
 # In[3]:
 
 sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+sess.as_default()
 
 
 # #### Generative Network
