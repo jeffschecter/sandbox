@@ -274,8 +274,6 @@ validate_batch_size = BATCH_SIZE
 validate_every_n_batches = 100
 use_tensorboard = True
 
-figsize(16, 1.5)
-
 def PrepBatch(ims, start, stop):
     batch = ims[start:stop].reshape((stop - start,) + ims.shape[1:3] + (1,))
     return (batch / 127.5) - 1
