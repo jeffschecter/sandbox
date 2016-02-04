@@ -92,12 +92,7 @@ def ELU(x):
 
 # In[3]:
 
-try:
-    del(sess)
-    print "deleted session"
-except Exception as e:
-    print "no existing session to delete"
-sess = tf.InteractiveSession()
+sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
 
 # #### Generative Network
