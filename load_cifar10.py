@@ -1,27 +1,5 @@
 import cPickle
-import gzip
 import os
-import shutil
-import sys
-import urllib2
-
-
-def MaybeDownload():
-    dataset_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
-
-    if "cifar10" not in os.listdir("."):
-        os.mkdir("cifar10")
-
-    if "batches.meta" not in os.listdir("./cifar10/"):
-        try:
-            sys.stdout.write("Retrieving tar...")
-            sys.stdout.flush()
-            blob = urllib2.urlopen(dataset_url).read()
-            sys.stdout.write(" fetched...")
-            sys.stdout.flush()
-            #TODO
-        except:
-            pass
 
 
 def LoadBatch(file):
@@ -31,7 +9,6 @@ def LoadBatch(file):
 
 
 def Batches():
-    MaybeDownload()
     prefix = "./cifar10/"
     batches = (
         "data_batch_1",
