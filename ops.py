@@ -31,10 +31,10 @@ def Bias(shape, sd=0.02):
     return tf.Variable(initial, name="bias")
 
 
-def HiddenLayer(inp, shape, nonlin=ELU, init=0.001, scope="RBM"):
+def HiddenLayer(inp, shape, nonlin=ELU, sd=0.001, scope="RBM"):
     with tf.name_scope(scope) as ns:
-        W = Weight(shape, init=init)
-        b = Bias([shape[1]], init=init)
+        W = Weight(shape, sd=sd)
+        b = Bias([shape[1]], sd=sd)
         h = nonlin(tf.matmul(inp, W) + b)
         return W, b, h
 
