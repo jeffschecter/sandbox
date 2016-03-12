@@ -76,25 +76,30 @@ def StridedConv(x, W):
         name="strided_conv")
 
 
-# The function tf.nn.deconv2d is an undecumented part of the TensorFlow API,
-# and is pretty half baked. For instance, unlike just about every other similar
-# function, deconv2d can't handle a batch size of -1. Even worse, instead of
-# throwing a py Exception, it results in an uncaught C++ error that crashes the
-# iPython kernel. And its signature or internals may unexpectedly change at any
-# point in the future, since it's not a stable part of the API.
-
-# Anyway, the crux of the matter is: it forces us to commit to a single batch
-# size for the entire network architecture.
-BATCH_SIZE = 100
-def FractionallyStridedConv(x, W, output_channels=None, batch_size=BATCH_SIZE):
-    _, height, width, kernels = x.get_shape().as_list()
+def FractionallyStridedConv(x, W, input_shape=None, output_channels=None):
+    _, height, width, kernels = input_shape or tf.shape(x)
     if output_channels is None:
         output_channels = kernels / 2
-    return tf.nn.deconv2d(
+    return tf.nn.conv2d_transpose(
         x, W,
-        [batch_size, height * 2, width * 2, output_channels],
+        tf.pack([tf.shape(x)[0], height * 2, width * 2, output_channels]),
         [1, 2, 2, 1],
-        name="fractionally_strided_conv")
+        name="fractionally_strided_conv",
+        padding="VALID")
+
+
+def FractionallyStridedConvLayer(x, nonlinearity, name, input_shape=None, output_channels=None):
+    kernels = input_shape[-1] if input_shape else tf.shape(x)[-1]
+    if output_channels is None:
+        output_channels = kernels / 2
+    with tf.name_scope(name) as scope:
+        W = Weight([2, 2, int(output_channels), int(kernels)])
+        b = Bias([int(output_channels)])
+        h = nonlinearity(FractionallyStridedConv(
+            x, W,
+            input_shape=input_shape,
+            output_channels=output_channels) + b)
+    return h
 
 
 # --------------------------------------------------------------------------- #
