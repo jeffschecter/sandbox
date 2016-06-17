@@ -11,10 +11,10 @@ def LoadBatch(file):
     return images, labels
 
 
-def Batches(include_labels=False):
+def Batches(include_labels=False, dataset="cifar10"):
     prefix = os.path.join(
         os.path.dirname(os.path.realpath(__file__)),
-        "cifar10/")
+        dataset)
     batches = (
         "data_batch_1",
         "data_batch_2",
