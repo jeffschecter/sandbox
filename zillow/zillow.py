@@ -286,5 +286,5 @@ def VectorizeFacts(facts):
   facts = facts.map(
       lambda l: " ".join([NONWORD_RE.sub("", elt) for elt in l]))
   vectorizer = CountVectorizer(
-      min_df=0.01, max_df=0.9, analyzer="word")
+      min_df=100, max_df=0.9, analyzer="word")
   return vectorizer, vectorizer.fit_transform(facts).toarray()
