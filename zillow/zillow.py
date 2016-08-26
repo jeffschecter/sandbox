@@ -215,9 +215,9 @@ def SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=None):
       sep='\t', index=False)
 
 
-def ProcessRegion(city, state_abbrev, savedir, zipcode=None):
+def ProcessRegion(city, state_abbrev, savedir, zipcode=None, poolsize=100):
   listings = ScanRegion(city, state_abbrev, zipcode=zipcode)
-  listing_data = BulkProcessListings(listings, poolsize=100)
+  listing_data = BulkProcessListings(listings, poolsize=poolsize)
   SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=zipcode)
 
 
@@ -261,6 +261,10 @@ def LoadTabularData(savedir):
       for handle in os.listdir(tsv_dir)]
   df = pd.concat(dfs, ignore_index=True)
   df["log_sold_to_zestimate"] = np.log2(df.last_sold / df.zestimate)
+  df["facts"] = (df.facts
+      .map(lambda s: s.strip("u[],'"))
+      .map(lambda s: s.split("', u'"))
+      .map(lambda l: [elt for elt in l if "ast s" not in elt]))
   cleaned = df[(df.zestimate > 0) & (df.last_sold > 0)]
   return cleaned.drop_duplicates("zpid").reset_index(drop=True)
 

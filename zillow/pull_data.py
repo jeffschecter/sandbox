@@ -20,6 +20,9 @@ gflags.DEFINE_list(
 gflags.DEFINE_list(
     "cities", None,
     "Only process zipcodes in these cities.")
+gflags.DEFINE_integer(
+    "poolsize", 100,
+    "Number of simultaneous threads with which to pull listing data.")
 
 
 def LoadZipcodes(savedir, cities=None, states=None):
@@ -47,7 +50,7 @@ def LoadAlreadyProcessed(savedir):
     return set([])
 
 
-def main(savedir, cities=None, states=None):
+def main(savedir, cities=None, states=None, poolsize=100):
   region_triples = LoadZipcodes(savedir, cities=cities, states=states)
   already_processed = LoadAlreadyProcessed(savedir)
   for city, state, zipcode in region_triples:
@@ -56,10 +59,17 @@ def main(savedir, cities=None, states=None):
     else:
       print "++ Scanning {c}, {s} zip {z}".format(c=city, s=state, z=zipcode)
       sys.stdout.flush()
-      zillow.ProcessRegion(city, state, savedir, zipcode=zipcode)
+      zillow.ProcessRegion(
+          city, state, savedir,
+          zipcode=zipcode,
+          poolsize=poolsize)
       zillow.PostprocessImages(savedir)
 
 
 if __name__ == "__main__":
   FLAGS(sys.argv)
-  main(FLAGS.savedir, cities=FLAGS.cities, states=FLAGS.states)
+  main(
+      FLAGS.savedir,
+      cities=FLAGS.cities,
+      states=FLAGS.states,
+      poolsize=FLAGS.poolsize)
