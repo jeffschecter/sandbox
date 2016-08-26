@@ -11,12 +11,14 @@ import pandas as pd
 import numpy as np
 
 from scipy import misc
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 NONDIGIT_RE = re.compile(r"[^0-9.]")
 LAST_SOLD_RE = re.compile(r"(^.*\$)|([^0-9])")
 ADDR_RE = re.compile(r"^([^,]+), ([A-Z]{2}) (\d+)$")
 ZPID_RE = re.compile(r"/(\d+)_zpid/")
+NONWORD_RE = re.compile(r"\W")
 NOW = pd.to_datetime("now")
 
 
@@ -274,3 +276,15 @@ def LoadImageDataIntoDataFrame(df, savedir):
   images = df.zpid.map(
       lambda z: misc.imread(os.path.join(img_dir, "{}.jpg".format(int(z)))))
   df["image"] = images
+
+
+# --------------------------------------------------------------------------- #
+# Feature Extraction.                                                         #
+# --------------------------------------------------------------------------- #
+
+def VectorizeFacts(facts):
+  facts = facts.map(
+      lambda l: " ".join([NONWORD_RE.sub("", elt) for elt in l]))
+  vectorizer = CountVectorizer(
+      min_df=0.01, max_df=0.9, analyzer="word")
+  return vectorizer, vectorizer.fit_transform(facts).toarray()
