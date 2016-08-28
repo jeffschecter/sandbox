@@ -23,6 +23,12 @@ gflags.DEFINE_list(
 gflags.DEFINE_integer(
     "poolsize", 100,
     "Number of simultaneous threads with which to pull listing data.")
+gflags.DEFINE_boolean(
+    "postprocess", True,
+    "Whether to postprocess images.")
+gflags.DEFINE_integer(
+    "cap", None,
+    "Max regions to process.")
 
 
 def LoadZipcodes(savedir, cities=None, states=None):
@@ -50,10 +56,16 @@ def LoadAlreadyProcessed(savedir):
     return set([])
 
 
-def main(savedir, cities=None, states=None, poolsize=100):
+def main(
+    savedir,
+    cities=None, states=None, poolsize=100, postprocess=True, cap=None):
   region_triples = LoadZipcodes(savedir, cities=cities, states=states)
   already_processed = LoadAlreadyProcessed(savedir)
+  processed = 0
   for city, state, zipcode in region_triples:
+    if cap is not None and processed >= cap:
+      print "Hit cap!"
+      break
     if (city, state, zipcode) in already_processed:
       print "-- Skipping {c}, {s} zip {z}".format(c=city, s=state, z=zipcode)
     else:
@@ -63,7 +75,9 @@ def main(savedir, cities=None, states=None, poolsize=100):
           city, state, savedir,
           zipcode=zipcode,
           poolsize=poolsize)
-      zillow.PostprocessImages(savedir)
+      if postprocess:
+        zillow.PostprocessImages(savedir)
+      processed += 1
 
 
 if __name__ == "__main__":
@@ -72,4 +86,6 @@ if __name__ == "__main__":
       FLAGS.savedir,
       cities=FLAGS.cities,
       states=FLAGS.states,
-      poolsize=FLAGS.poolsize)
+      poolsize=FLAGS.poolsize,
+      postprocess=FLAGS.postprocess,
+      cap=FLAGS.cap)

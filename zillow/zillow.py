@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-import multiprocessing
 import os
 import re
+import sys
 import urllib2
 
 import bs4
@@ -10,6 +10,7 @@ import bs4
 import pandas as pd
 import numpy as np
 
+from multiprocessing import pool
 from scipy import misc
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -19,6 +20,8 @@ LAST_SOLD_RE = re.compile(r"(^.*\$)|([^0-9])")
 ADDR_RE = re.compile(r"^([^,]+), ([A-Z]{2}) (\d+)$")
 ZPID_RE = re.compile(r"/(\d+)_zpid/")
 NONWORD_RE = re.compile(r"\W")
+
+
 NOW = pd.to_datetime("now")
 
 
@@ -97,7 +100,7 @@ def ParseAddress(soup):
 
 def ParseHomeDetailsPage(zpid):
   url = "http://www.zillow.com/homedetails/{}_zpid/".format(zpid)
-  html = urllib2.urlopen(url).read()
+  html = urllib2.urlopen(url, timeout=20).read()
   soup = bs4.BeautifulSoup(html, "lxml")
   facts = ParseFacts(soup)
   details = {
@@ -110,17 +113,20 @@ def ParseHomeDetailsPage(zpid):
   return details
 
 
-def ProcessListing(zpid_imgurl_pair):
+def ProcessListing(zpid_imgurl_pair, verbose=True):
   try:
     zpid, url = zpid_imgurl_pair
     home_details = {
         "zpid": zpid,
         "img_url": url,
-        "image": urllib2.urlopen(url).read()}
+        "image": urllib2.urlopen(url, timeout=20).read()}
     home_details.update(ParseHomeDetailsPage(zpid))
+    if verbose:
+      sys.stdout.write(".")
+      sys.stdout.flush()
     return home_details
   except Exception as e:
-    {"zpid": zpid, "error": e}
+    return {"zpid": zpid, "error": str(e)}
 
 
 # --------------------------------------------------------------------------- #
@@ -140,26 +146,30 @@ def ParseImageContainer(cont):
 
 
 def ParseResultsPage(region, page=1):
-  base_url = "http://www.zillow.com/{region}/sold/house_type/{page}_p/"
-  url = base_url.format(region=region, page=page)
-  doc = urllib2.urlopen(url)
-  html = doc.read()
-  soup = bs4.BeautifulSoup(html, "lxml")
+  try:
+    base_url = "http://www.zillow.com/{region}/sold/house_type/{page}_p/"
+    url = base_url.format(region=region.replace(" ", "%20"), page=page)
+    doc = urllib2.urlopen(url)
+    html = doc.read()
+    soup = bs4.BeautifulSoup(html, "lxml")
 
-  # ZPIDs
-  links = [
-      a["href"] for a
-      in soup.find_all("a", class_="zsg-photo-card-overlay-link")]
-  pids = [ZPID_RE.search(href).group(1) for href in links]
+    # ZPIDs
+    links = [
+        a["href"] for a
+        in soup.find_all("a", class_="zsg-photo-card-overlay-link")]
+    pids = [ZPID_RE.search(href).group(1) for href in links]
 
-  # Photos
-  img_urls = [
-      ParseImageContainer(cont) for cont 
-      in soup.find_all("div", class_="zsg-photo-card-img")]
-  
-  return [
-      (pid, url) for pid, url in zip(pids, img_urls)
-      if url is not None]
+    # Photos
+    img_urls = [
+        ParseImageContainer(cont) for cont 
+        in soup.find_all("div", class_="zsg-photo-card-img")]
+    
+    return [
+        (pid, url) for pid, url in zip(pids, img_urls)
+        if url is not None]
+
+  except:
+    return []
 
 
 def ParseResultsPageWrapper(pair):
@@ -174,12 +184,11 @@ def ScanRegion(city, state_abbrev, zipcode=None):
   region = "{}-{}".format(city, state_abbrev)
   if zipcode is not None:
     region += "-" + str(zipcode)
-  pool = multiprocessing.Pool(20)
-  pages = pool.map(
+  tpool = pool.ThreadPool(20)
+  pages = tpool.map(
       ParseResultsPageWrapper,
-      zip(np.repeat(region, 20), np.arange(1, 21)),
-      chunksize=1)
-  pool.close()
+      zip(np.repeat(region, 20), np.arange(1, 21)))
+  tpool.close()
   listings = []
   for page in pages:
     listings += page
@@ -187,10 +196,11 @@ def ScanRegion(city, state_abbrev, zipcode=None):
 
 
 def BulkProcessListings(zpid_imgurl_pair_list, poolsize=20):
-  pool = multiprocessing.Pool(poolsize)
-  listing_data = pool.map(ProcessListing, zpid_imgurl_pair_list)
-  pool.close()
-  return [l for l in listing_data if l is not None]
+  tpool = pool.ThreadPool(poolsize)
+  listing_data = tpool.map(ProcessListing, zpid_imgurl_pair_list)
+  tpool.close()
+  sys.stdout.write("\n")
+  return [l for l in listing_data if "error" not in l]
 
 
 def SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=None):
@@ -219,8 +229,9 @@ def SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=None):
 
 def ProcessRegion(city, state_abbrev, savedir, zipcode=None, poolsize=100):
   listings = ScanRegion(city, state_abbrev, zipcode=zipcode)
-  listing_data = BulkProcessListings(listings, poolsize=poolsize)
-  SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=zipcode)
+  if listings:
+    listing_data = BulkProcessListings(listings, poolsize=poolsize)
+    SaveListingData(listing_data, city, state_abbrev, savedir, zipcode=zipcode)
 
 
 # --------------------------------------------------------------------------- #
@@ -267,6 +278,7 @@ def LoadTabularData(savedir):
       .map(lambda s: s.strip("u[],'"))
       .map(lambda s: s.split("', u'"))
       .map(lambda l: [elt for elt in l if "ast s" not in elt]))
+  df["permits"] = df.permits.map(eval)
   cleaned = df[(df.zestimate > 0) & (df.last_sold > 0)]
   return cleaned.drop_duplicates("zpid").reset_index(drop=True)
 
@@ -287,4 +299,4 @@ def VectorizeFacts(facts):
       lambda l: " ".join([NONWORD_RE.sub("", elt) for elt in l]))
   vectorizer = CountVectorizer(
       min_df=100, max_df=0.9, analyzer="word")
-  return vectorizer, vectorizer.fit_transform(facts).toarray()
+  return vectorizer, np.minimum(vectorizer.fit_transform(facts).toarray(), 1)
