@@ -264,8 +264,39 @@ def PostprocessImages(savedir):
 
 
 # --------------------------------------------------------------------------- #
+# Feature Extraction.                                                         #
+# --------------------------------------------------------------------------- #
+
+def VectorizeFacts(facts):
+  facts = facts.map(
+      lambda l: " ".join([NONWORD_RE.sub("", elt) for elt in l]))
+  vectorizer = CountVectorizer(
+      min_df=100, max_df=0.9, analyzer="word")
+  return vectorizer, np.minimum(vectorizer.fit_transform(facts).toarray(), 1)
+
+
+def FloorAndLotSize(facts):
+    floor_size = 0
+    lot_size = 0
+    for fact in facts:
+      if fact.startswith("Floor size:"):
+        floor_size = ParseNumber(fact)
+      elif fact.startswith("Lot:"):
+        lot_size = ParseNumber(fact)
+        if "acre" in fact:
+            lot_size *= 43560
+      if floor_size > 0 and lot_size > 0:
+        break
+    return floor_size, lot_size
+
+
+# --------------------------------------------------------------------------- #
 # Data loading.                                                               #
 # --------------------------------------------------------------------------- #
+
+def UseableFact(fact):
+  return "ast s" not in fact and fact != "All time views"
+
 
 def LoadTabularData(savedir):
   tsv_dir = os.path.join(savedir, "tabular")
@@ -277,7 +308,7 @@ def LoadTabularData(savedir):
   df["facts"] = (df.facts
       .map(lambda s: s.strip("u[],'"))
       .map(lambda s: s.split("', u'"))
-      .map(lambda l: [elt for elt in l if "ast s" not in elt]))
+      .map(lambda l: [f for f in l UseableFact(f)]))
   df["permits"] = df.permits.map(eval)
   cleaned = df[(df.zestimate > 0) & (df.last_sold > 0)]
   return cleaned.drop_duplicates("zpid").reset_index(drop=True)
@@ -288,15 +319,3 @@ def LoadImageDataIntoDataFrame(df, savedir):
   images = df.zpid.map(
       lambda z: misc.imread(os.path.join(img_dir, "{}.jpg".format(int(z)))))
   df["image"] = images
-
-
-# --------------------------------------------------------------------------- #
-# Feature Extraction.                                                         #
-# --------------------------------------------------------------------------- #
-
-def VectorizeFacts(facts):
-  facts = facts.map(
-      lambda l: " ".join([NONWORD_RE.sub("", elt) for elt in l]))
-  vectorizer = CountVectorizer(
-      min_df=100, max_df=0.9, analyzer="word")
-  return vectorizer, np.minimum(vectorizer.fit_transform(facts).toarray(), 1)
