@@ -308,7 +308,7 @@ def LoadTabularData(savedir):
   df["facts"] = (df.facts
       .map(lambda s: s.strip("u[],'"))
       .map(lambda s: s.split("', u'"))
-      .map(lambda l: [f for f in l UseableFact(f)]))
+      .map(lambda l: [f for f in l if UseableFact(f)]))
   df["permits"] = df.permits.map(eval)
   cleaned = df[(df.zestimate > 0) & (df.last_sold > 0)]
   return cleaned.drop_duplicates("zpid").reset_index(drop=True)
