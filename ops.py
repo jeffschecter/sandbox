@@ -31,7 +31,7 @@ def Bias(shape, sd=0.02):
     return tf.Variable(initial, name="bias")
 
 
-def HiddenLayer(inp, shape, nonlin=ELU, sd=0.001, scope="RBM"):
+def HiddenLayer(inp, shape, nonlin=ELU, sd=0.001, scope="Hidden"):
     with tf.name_scope(scope) as ns:
         W = Weight(shape, sd=sd)
         b = Bias([shape[1]], sd=sd)
@@ -100,6 +100,17 @@ def FractionallyStridedConvLayer(x, nonlinearity, name, input_shape=None, output
             input_shape=input_shape,
             output_channels=output_channels) + b)
     return h
+
+
+def ResNetCell(inp, channels, name, nonlin=tf.nn.relu):
+    inp_channels = int(inp.get_shape()[-1])
+    scale = int(channels / inp_channels)
+    if inp_channels * scale != channels:
+        raise ValueError("Channels must be a whole number multiple of input's channels.")
+    with tf.name_scope(name) as ns:
+        c1 = ConvLayer(inp, 3, channels, nonlin, "ResCellConv1")
+        c2 = ConvLayer(c1, 3, channels, nonlin, "ResCellConv2")
+        return c2 + tf.tile(inp, [1, 1, 1, scale])
 
 
 # --------------------------------------------------------------------------- #
